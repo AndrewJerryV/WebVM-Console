@@ -1,0 +1,16 @@
+# Ignore large operating system ISO files to prevent GitHub file size errors
+distros/BionicPup32-19.03-250402.iso
+distros/NoblePup32-24.04-260601.iso
+distros/noblepup32-nonpae.iso
+distros/noblepup32-nonpae-new.iso
+distros/slitaz-rolling.iso
+
+# Allow small preset distros for out-of-the-box GitHub Pages support
+!distros/kolibri.img
+!distros/TinyCore-11.0.iso
+!distros/dsl-4.4.10.iso
+
+# Ignore system configuration/cache folders
+.gemini/
+.DS_Store
+Thumbs.db

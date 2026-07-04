@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebVM Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Oxanium:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  
+  <script>
+    // Register Service Worker to inject COOP/COEP headers client-side for SharedArrayBuffer performance
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("coop-coep-sw.js").then((reg) => {
+        console.log("[v86] Service Worker active with scope:", reg.scope);
+        // Reload page once if newly installed and not controlling yet to apply headers
+        if (reg.active && !navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
+      }).catch((err) => {
+        console.error("[v86] Service Worker registration failed:", err);
+      });
+    }
+  </script>
+
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="logo-container">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="color: var(--bg); display: block;"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+      </div>
+      <div class="logo-text">
+        <h1>WebVM Console</h1>
+      </div>
+    </div>
+    <div class="status-badge">
+      <div class="status-dot" id="global-status-dot"></div>
+      <span id="global-status-text">OFFLINE</span>
+    </div>
+  </header>
+
+  <!-- Main Grid Workspace -->
+  <div class="app-container">
+
+    <!-- Left Controls Panel -->
+    <div class="sidebar">
+      
+      <!-- VM Controls -->
+      <div class="panel">
+        <div class="panel-title">
+          <span>Control Center</span>
+        </div>
+        
+        <!-- Presets Selection (Optional Preset OS images) -->
+        <div style="position: relative; width: 100%;">
+          <select id="preset-select" class="select-preset">
+            <option value="">-- Choose OS Preset (Optional) --</option>
+            <option value="distros/kolibri.img">KolibriOS Desktop (1.4 MB)</option>
+            <option value="distros/TinyCore-11.0.iso">TinyCore Linux Desktop (19.9 MB)</option>
+            <option value="distros/slitaz-rolling.iso">SliTaz GNU/Linux Desktop (61.8 MB)</option>
+            <option value="distros/dsl-4.4.10.iso">Damn Small Linux Desktop (50.0 MB)</option>
+          </select>
+        </div>
+
+        <!-- Double Dropzone: Left for ISO, Right for VM State -->
+        <div style="display: flex; gap: 10px;">
+          <div class="file-dropzone" style="flex: 1; padding: 15px 10px;" onclick="document.getElementById('iso-upload').click()">
+            <div class="file-dropzone-icon">
+              <i class="fa-solid fa-compact-disc" style="color: var(--cyan); font-size: 1.5rem; display: block; margin-bottom: 6px;"></i>
+            </div>
+            <div class="file-dropzone-text" style="font-size: 0.65rem; font-weight: bold; margin-top: 4px;">Load ISO</div>
+            <input type="file" id="iso-upload" accept=".iso,.img,.bin">
+          </div>
+          <div class="file-dropzone" style="flex: 1; padding: 15px 10px;" onclick="document.getElementById('state-upload').click()">
+            <div class="file-dropzone-icon">
+              <i class="fa-solid fa-floppy-disk" style="color: var(--green); font-size: 1.5rem; display: block; margin-bottom: 6px;"></i>
+            </div>
+            <div class="file-dropzone-text" style="font-size: 0.65rem; font-weight: bold; margin-top: 4px;">Load State</div>
+            <input type="file" id="state-upload" accept=".bin">
+          </div>
+        </div>
+        <div class="file-info" id="file-info"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); padding: 8px 12px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.72rem;">
+          <span style="color: var(--text-dim); font-weight: bold; letter-spacing: 0.5px;">AUTO-SAVE SESSION</span>
+          <input type="checkbox" id="autosave-toggle" checked style="cursor: pointer; accent-color: var(--green);">
+        </div>
+
+        <div class="control-grid">
+          <button class="btn btn-primary" id="btn-start" disabled>Start Boot</button>
+          <button class="btn" id="btn-pause" disabled>Pause</button>
+        </div>
+        <div class="control-grid">
+          <button class="btn" id="btn-save-state" disabled>Save State</button>
+          <button class="btn" id="btn-fullscreen" disabled>Fullscreen</button>
+        </div>
+        <div class="control-grid" style="grid-template-columns: 1fr;">
+          <button class="btn" id="btn-restore-session" disabled><i class="fa-solid fa-clock-rotate-left" style="color: var(--green);"></i> Restore Last Session</button>
+        </div>
+        <div class="control-grid" style="grid-template-columns: 1fr;">
+          <button class="btn" id="btn-reset" disabled>Reboot Machine</button>
+        </div>
+      </div>
+
+      <!-- VM Status Stats -->
+      <div class="panel panel-compact">
+        <div class="panel-title">
+          <span>System Monitors</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Power State</span>
+          <span class="stat-value" id="stat-state">TERMINATED</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Memory Allocated</span>
+          <span class="stat-value" id="stat-memory">512 MB</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Host CPU Cores</span>
+          <span class="stat-value" id="stat-cores">-</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Virtual Networking</span>
+          <span class="stat-value">Simulated</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Center Display -->
+    <div class="screen-wrapper">
+      <div class="screen-header">
+        <div class="screen-title">
+          <span style="color: var(--cyan);">[VGA OUTPUT]</span> screen0.x
+        </div>
+      </div>
+      <div class="screen-body">
+        
+        <!-- Loading / Awaiting File HUD overlay -->
+        <div class="screen-overlay" id="screen-hud">
+          <div class="overlay-spinner" id="hud-spinner" style="display:none;"></div>
+          <div class="overlay-message" id="hud-message">
+            <strong>SYSTEM INACTIVE</strong>
+            Please select an operating system image file in the sidebar to load the WebAssembly kernel.
+          </div>
+        </div>
+
+        <!-- The target element where v86 draws the virtual frame buffer -->
+        <div id="screen_container">
+          <div id="screen" style="white-space: pre; font: 14px monospace; line-height: 14px"></div>
+          <canvas id="vga" style="display: none"></canvas>
+        </div>
+
+      </div>
+
+      <!-- Collapsible Serial Console Drawer -->
+      <div class="serial-drawer" id="serial-drawer">
+        <div class="serial-header" id="serial-header">
+          <span class="serial-title"><i class="fa-solid fa-terminal" style="color: var(--green);"></i> Serial Console Log</span>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-serial-action" id="btn-clear-serial">Clear</button>
+            <button class="btn-serial-action" id="btn-toggle-serial">Expand</button>
+          </div>
+        </div>
+        <div class="serial-body" id="serial-body"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Load v86 as a classic script locally -->
+  <script src="libv86.js"
+          onerror="document.getElementById('hud-message').innerHTML='<strong style=color:#ff3b69>FAILED TO LOAD v86 LIBRARY</strong>Make sure libv86.js exists in the same folder and refresh.'"></script>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
+
