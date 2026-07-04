@@ -7,7 +7,6 @@ distros/noblepup32-nonpae-new.iso
 # Allow small preset distros for out-of-the-box GitHub Pages support
 !distros/kolibri.img
 !distros/TinyCore-11.0.iso
-!distros/dsl-4.4.10.iso
 !distros/slitaz-rolling.iso
 
 # Ignore system configuration/cache folders
