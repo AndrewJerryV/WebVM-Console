@@ -15,7 +15,12 @@
         console.log("[v86] Service Worker active with scope:", reg.scope);
         // Reload page once if newly installed and not controlling yet to apply headers
         if (reg.active && !navigator.serviceWorker.controller) {
-          window.location.reload();
+          if (!sessionStorage.getItem("sw-reloaded")) {
+            sessionStorage.setItem("sw-reloaded", "1");
+            window.location.reload();
+          }
+        } else {
+          sessionStorage.removeItem("sw-reloaded");
         }
       }).catch((err) => {
         console.error("[v86] Service Worker registration failed:", err);
@@ -62,6 +67,7 @@
             <option value="distros/kolibri.img">KolibriOS Desktop (1.4 MB)</option>
             <option value="distros/TinyCore-11.0.iso">TinyCore Linux Desktop (19.9 MB)</option>
             <option value="distros/slitaz-rolling.iso">SliTaz GNU/Linux Desktop (61.8 MB)</option>
+            <option value="distros/android-x86-1.6-r2.iso">Android-x86 1.6 r2 Desktop (52.1 MB)</option>
           </select>
         </div>
 

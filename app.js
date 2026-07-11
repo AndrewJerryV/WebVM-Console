@@ -253,27 +253,8 @@ async function triggerAutoSave() {
 // ── Boot emulator ──
 btnStart.addEventListener('click', async function() {
   let presetUrl = presetSelect ? presetSelect.value : "";
-  
-  // Download preset dynamically first if selected
-  if (presetUrl && !isoFile) {
-    btnStart.disabled = true;
-    hudSpinner.style.display = 'block';
-    hudMessage.innerHTML = '<strong>STREAMING PRESET IMAGE</strong>Fetching ' + presetUrl.substring(presetUrl.lastIndexOf('/') + 1) + ' from server...';
-    try {
-      const resp = await fetch(presetUrl);
-      if (!resp.ok) throw new Error("Preset fetch failed");
-      const blob = await resp.blob();
-      const filename = presetUrl.substring(presetUrl.lastIndexOf('/') + 1);
-      isoFile = new File([blob], filename);
-    } catch(e) {
-      hudSpinner.style.display = 'none';
-      hudMessage.innerHTML = '<strong style="color:#ff3b69">FAILED TO DOWNLOAD PRESET</strong>' + e.message;
-      btnStart.disabled = false;
-      return;
-    }
-  }
 
-  if ((!isoFile && !stateBuffer) || !V86Constructor) return;
+  if ((!presetUrl && !isoFile && !stateBuffer) || !V86Constructor) return;
 
   btnStart.disabled = true;
   hudSpinner.style.display = 'block';
@@ -328,7 +309,9 @@ btnStart.addEventListener('click', async function() {
     let memorySize = 512 * 1024 * 1024; 
     let acpiEnabled = false;
     let networkRelayUrl = "wss://relay.widgetry.org/";
-    if (isoFile && isoFile.name.toLowerCase().endsWith(".img")) {
+    const isImg = (isoFile && isoFile.name.toLowerCase().endsWith(".img")) || 
+                  (presetUrl && presetUrl.toLowerCase().endsWith(".img"));
+    if (isImg) {
       acpiEnabled = true;
       networkRelayUrl = ""; // Disable network card interrupts for KolibriOS
     }
@@ -354,7 +337,16 @@ btnStart.addEventListener('click', async function() {
       network_relay_url: networkRelayUrl || undefined // Dynamic network bridge
     };
 
-    if (isoFile) {
+    if (presetUrl) {
+      const name = presetUrl.toLowerCase();
+      if (name.endsWith(".iso")) {
+        config.cdrom = { url: presetUrl, async: true };
+      } else if (name.endsWith(".img")) {
+        config.fda = { url: presetUrl, async: true };
+      } else {
+        config.hda = { url: presetUrl, async: true };
+      }
+    } else if (isoFile) {
       const name = isoFile.name.toLowerCase();
       if (name.endsWith(".iso")) {
         config.cdrom = { buffer: isoFile };
@@ -386,6 +378,18 @@ btnStart.addEventListener('click', async function() {
       btnSaveState.disabled = false;
       btnReset.disabled = false;
       btnFullscreen.disabled = false;
+
+      // Hack: Automatically boot Android by pressing enter
+      const isAndroid = (isoFile && isoFile.name.toLowerCase().includes("android")) || 
+                        (presetSelect && presetSelect.value && presetSelect.value.toLowerCase().includes("android"));
+      if (isAndroid) {
+        setTimeout(function() {
+          if (emulator) {
+            console.log('[v86] Automatically pressing Enter to boot Android...');
+            emulator.keyboard_send_text("\n");
+          }
+        }, 3000);
+      }
 
       // Enable Pointer Lock on clicking the screen container so cursor doesn't wander off-screen
       const container = document.getElementById("screen_container");
